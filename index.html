@@ -25,6 +25,25 @@
         .toast { position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 10px 20px; border-radius: 4px; z-index: 1000; }
         .toast.error { background: #dc3545; }
         .toast.warning { background: #ffc107; color: #000; }
+        
+        /* Traffic marker styles */
+        .traffic-signal-marker {
+            background: transparent;
+            border: none;
+            font-size: 16px;
+        }
+        
+        .construction-marker {
+            background: transparent;
+            border: none;
+            font-size: 16px;
+        }
+        
+        .traffic-signal-marker:hover,
+        .construction-marker:hover {
+            transform: scale(1.2);
+            transition: transform 0.2s ease;
+        }
     </style>
 </head>
 <body>
@@ -59,6 +78,22 @@
                     <span>Speed:</span>
                     <span id="speed">--</span>
                 </div>
+                <div class="info">
+                    <span>Traffic Impact:</span>
+                    <span id="traffic-impact">--</span>
+                </div>
+                <div class="info">
+                    <span>Traffic Signals:</span>
+                    <span id="traffic-signals">--</span>
+                </div>
+                <div class="info">
+                    <span>Construction:</span>
+                    <span id="construction">--</span>
+                </div>
+                <div class="info">
+                    <span>Road Closures:</span>
+                    <span id="closures">--</span>
+                </div>
             </div>
         </div>
         
@@ -70,9 +105,274 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+        // OpenStreetMap Traffic Service
+        class OpenStreetMapTrafficService {
+            constructor() {
+                this.baseUrl = 'https://overpass-api.de/api/interpreter';
+                this.cache = new Map();
+                this.cacheTimeout = 300000; // 5 minutes cache
+            }
+            
+            async getTrafficData(bounds) {
+                const cacheKey = this.getBoundsKey(bounds);
+                const cached = this.cache.get(cacheKey);
+                
+                if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+                    return cached.data;
+                }
+                
+                const query = this.buildTrafficQuery(bounds);
+                const data = await this.executeQuery(query);
+                
+                this.cache.set(cacheKey, {
+                    data: data,
+                    timestamp: Date.now()
+                });
+                
+                return data;
+            }
+            
+            buildTrafficQuery(bounds) {
+                return `
+[out:json][timeout:25];
+(
+  // Traffic signals
+  node["highway"="traffic_signals"](${bounds});
+  way["highway"="traffic_signals"](${bounds});
+  
+  // Speed limits
+  way["maxspeed"](${bounds});
+  
+  // Traffic calming measures
+  way["traffic_calming"](${bounds});
+  
+  // Road restrictions
+  relation["type"="restriction"](${bounds});
+  
+  // Construction zones
+  way["construction"](${bounds});
+  node["construction"](${bounds});
+  
+  // Road closures
+  way["access"="no"](${bounds});
+  way["motor_vehicle"="no"](${bounds});
+  
+  // Bus lanes
+  way["bus"]="yes"(${bounds});
+  
+  // One-way streets
+  way["oneway"]="yes"(${bounds});
+);
+out geom;
+`;
+            }
+            
+            async executeQuery(query) {
+                try {
+                    const response = await fetch(this.baseUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `data=${encodeURIComponent(query)}`
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    return await response.json();
+                } catch (error) {
+                    console.error('Overpass API error:', error);
+                    return { elements: [] };
+                }
+            }
+            
+            getBoundsKey(bounds) {
+                return `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
+            }
+        }
+
+        // Traffic Data Processor
+        class TrafficDataProcessor {
+            constructor() {
+                this.trafficService = new OpenStreetMapTrafficService();
+            }
+            
+            async processTrafficData(route, bounds) {
+                const rawData = await this.trafficService.getTrafficData(bounds);
+                return this.analyzeTrafficElements(rawData.elements, route);
+            }
+            
+            analyzeTrafficElements(elements, route) {
+                const trafficData = {
+                    signals: [],
+                    speedLimits: [],
+                    restrictions: [],
+                    construction: [],
+                    closures: [],
+                    busLanes: [],
+                    oneWay: []
+                };
+                
+                elements.forEach(element => {
+                    switch (element.type) {
+                        case 'node':
+                            this.processNode(element, trafficData);
+                            break;
+                        case 'way':
+                            this.processWay(element, trafficData);
+                            break;
+                        case 'relation':
+                            this.processRelation(element, trafficData);
+                            break;
+                    }
+                });
+                
+                return this.calculateTrafficImpact(trafficData, route);
+            }
+            
+            processNode(node, trafficData) {
+                if (node.tags) {
+                    if (node.tags.highway === 'traffic_signals') {
+                        trafficData.signals.push({
+                            lat: node.lat,
+                            lng: node.lon,
+                            type: 'traffic_signal'
+                        });
+                    }
+                    
+                    if (node.tags.construction) {
+                        trafficData.construction.push({
+                            lat: node.lat,
+                            lng: node.lon,
+                            type: 'construction',
+                            description: node.tags.construction
+                        });
+                    }
+                }
+            }
+            
+            processWay(way, trafficData) {
+                if (way.tags) {
+                    // Speed limits
+                    if (way.tags.maxspeed) {
+                        trafficData.speedLimits.push({
+                            way: way,
+                            speedLimit: this.parseSpeedLimit(way.tags.maxspeed),
+                            type: 'speed_limit'
+                        });
+                    }
+                    
+                    // Traffic signals
+                    if (way.tags.highway === 'traffic_signals') {
+                        trafficData.signals.push({
+                            way: way,
+                            type: 'traffic_signal'
+                        });
+                    }
+                    
+                    // Construction
+                    if (way.tags.construction) {
+                        trafficData.construction.push({
+                            way: way,
+                            type: 'construction',
+                            description: way.tags.construction
+                        });
+                    }
+                    
+                    // Road closures
+                    if (way.tags.access === 'no' || way.tags.motor_vehicle === 'no') {
+                        trafficData.closures.push({
+                            way: way,
+                            type: 'closure',
+                            reason: way.tags.access === 'no' ? 'access_restricted' : 'motor_vehicle_restricted'
+                        });
+                    }
+                    
+                    // Bus lanes
+                    if (way.tags.bus === 'yes') {
+                        trafficData.busLanes.push({
+                            way: way,
+                            type: 'bus_lane'
+                        });
+                    }
+                    
+                    // One-way streets
+                    if (way.tags.oneway === 'yes') {
+                        trafficData.oneWay.push({
+                            way: way,
+                            type: 'one_way'
+                        });
+                    }
+                }
+            }
+            
+            processRelation(relation, trafficData) {
+                if (relation.tags && relation.tags.type === 'restriction') {
+                    trafficData.restrictions.push({
+                        relation: relation,
+                        type: 'restriction',
+                        description: relation.tags.restriction
+                    });
+                }
+            }
+            
+            parseSpeedLimit(maxspeed) {
+                if (typeof maxspeed === 'number') return maxspeed;
+                
+                const match = maxspeed.toString().match(/(\d+)/);
+                return match ? parseInt(match[1]) : 50; // Default 50 km/h
+            }
+            
+            calculateTrafficImpact(trafficData, route) {
+                const impact = {
+                    totalSignals: trafficData.signals.length,
+                    averageSpeedLimit: this.calculateAverageSpeedLimit(trafficData.speedLimits),
+                    constructionZones: trafficData.construction.length,
+                    roadClosures: trafficData.closures.length,
+                    busLanes: trafficData.busLanes.length,
+                    oneWayStreets: trafficData.oneWay.length,
+                    trafficMultiplier: 1.0,
+                    rawData: trafficData
+                };
+                
+                // Calculate traffic impact multiplier
+                impact.trafficMultiplier = this.calculateTrafficMultiplier(impact);
+                
+                return impact;
+            }
+            
+            calculateAverageSpeedLimit(speedLimits) {
+                if (speedLimits.length === 0) return 50; // Default
+                
+                const totalSpeed = speedLimits.reduce((sum, limit) => sum + limit.speedLimit, 0);
+                return totalSpeed / speedLimits.length;
+            }
+            
+            calculateTrafficMultiplier(impact) {
+                let multiplier = 1.0;
+                
+                // Traffic signals slow down traffic
+                multiplier += (impact.totalSignals * 0.05); // 5% per signal
+                
+                // Construction zones
+                multiplier += (impact.constructionZones * 0.2); // 20% per construction zone
+                
+                // Road closures
+                multiplier += (impact.roadClosures * 0.5); // 50% per closure
+                
+                // Bus lanes can improve traffic flow
+                multiplier -= (impact.busLanes * 0.1); // 10% improvement per bus lane
+                
+                return Math.max(multiplier, 0.5); // Minimum 50% of normal speed
+            }
+        }
+
         // Global variables
-        let map, startMarker, endMarker, routeLayer;
+        let map, startMarker, endMarker, routeLayer, trafficLayer;
         let startLocation = null, endLocation = null;
+        let trafficProcessor = new TrafficDataProcessor();
 
         // Initialize map
         function initMap() {
@@ -110,7 +410,7 @@
             endMarker.bindPopup('Destination').openPopup();
         }
 
-        // Find route
+        // Find route with traffic data
         async function findRoute() {
             if (!startLocation || !endLocation) {
                 showToast('Please select both locations', 'warning');
@@ -126,8 +426,23 @@
                 
                 if (data.routes && data.routes.length > 0) {
                     const route = data.routes[0];
+                    
+                    // Calculate bounds for traffic data
+                    const bounds = calculateRouteBounds(route.geometry.coordinates);
+                    
+                    // Get traffic data
+                    const trafficData = await trafficProcessor.processTrafficData(route, bounds);
+                    
+                    // Calculate traffic-adjusted time
+                    const adjustedDuration = calculateTrafficAdjustedTime(route, trafficData);
+                    
+                    // Display route with traffic info
                     displayRoute(route.geometry.coordinates);
-                    displayRouteInfo(route.distance, route.duration);
+                    displayRouteInfo(route.distance, adjustedDuration, trafficData);
+                    
+                    // Display traffic elements on map
+                    displayTrafficElements(trafficData);
+                    
                 } else {
                     showToast('No route found', 'error');
                 }
@@ -147,8 +462,38 @@
             map.fitBounds(L.polyline(latLngs).getBounds());
         }
 
-        // Display route information
-        function displayRouteInfo(distance, duration) {
+        // Calculate route bounds for traffic data
+        function calculateRouteBounds(coordinates) {
+            let minLat = Infinity, maxLat = -Infinity;
+            let minLng = Infinity, maxLng = -Infinity;
+            
+            coordinates.forEach(coord => {
+                const [lng, lat] = coord;
+                minLat = Math.min(minLat, lat);
+                maxLat = Math.max(maxLat, lat);
+                minLng = Math.min(minLng, lng);
+                maxLng = Math.max(maxLng, lng);
+            });
+            
+            // Add padding
+            const padding = 0.01;
+            return {
+                south: minLat - padding,
+                north: maxLat + padding,
+                west: minLng - padding,
+                east: maxLng + padding
+            };
+        }
+        
+        // Calculate traffic-adjusted time
+        function calculateTrafficAdjustedTime(route, trafficData) {
+            const baseDuration = route.duration; // seconds
+            const adjustedDuration = baseDuration * trafficData.trafficMultiplier;
+            return Math.round(adjustedDuration);
+        }
+        
+        // Display route information with traffic data
+        function displayRouteInfo(distance, duration, trafficData) {
             const distanceKm = (distance / 1000).toFixed(1);
             const durationMin = Math.round(duration / 60);
             const speedKmh = ((distance / 1000) / (duration / 3600)).toFixed(1);
@@ -156,7 +501,78 @@
             document.getElementById('distance').textContent = distanceKm + ' km';
             document.getElementById('duration').textContent = durationMin + ' min';
             document.getElementById('speed').textContent = speedKmh + ' km/h';
+            
+            // Display traffic information
+            document.getElementById('traffic-impact').textContent = 
+                (trafficData.trafficMultiplier * 100).toFixed(0) + '%';
+            document.getElementById('traffic-signals').textContent = trafficData.totalSignals;
+            document.getElementById('construction').textContent = trafficData.constructionZones;
+            document.getElementById('closures').textContent = trafficData.roadClosures;
+            
             document.getElementById('results').style.display = 'block';
+        }
+
+        // Display traffic elements on map
+        function displayTrafficElements(trafficData) {
+            // Clear existing traffic layer
+            if (trafficLayer) {
+                map.removeLayer(trafficLayer);
+            }
+            
+            trafficLayer = L.layerGroup().addTo(map);
+            
+            // Display traffic signals
+            trafficData.rawData.signals.forEach(signal => {
+                if (signal.lat && signal.lng) {
+                    const marker = L.marker([signal.lat, signal.lng], {
+                        icon: L.divIcon({
+                            className: 'traffic-signal-marker',
+                            html: '🚦',
+                            iconSize: [20, 20]
+                        })
+                    }).addTo(trafficLayer);
+                    marker.bindPopup('Traffic Signal');
+                }
+            });
+            
+            // Display construction zones
+            trafficData.rawData.construction.forEach(construction => {
+                if (construction.lat && construction.lng) {
+                    const marker = L.marker([construction.lat, construction.lng], {
+                        icon: L.divIcon({
+                            className: 'construction-marker',
+                            html: '🚧',
+                            iconSize: [20, 20]
+                        })
+                    }).addTo(trafficLayer);
+                    marker.bindPopup(`Construction: ${construction.description || 'Road work'}`);
+                }
+            });
+            
+            // Display road closures
+            trafficData.rawData.closures.forEach(closure => {
+                if (closure.way && closure.way.geometry) {
+                    const coordinates = closure.way.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                    L.polyline(coordinates, {
+                        color: 'red',
+                        weight: 3,
+                        opacity: 0.7,
+                        dashArray: '10, 10'
+                    }).addTo(trafficLayer).bindPopup('Road Closure');
+                }
+            });
+            
+            // Display bus lanes
+            trafficData.rawData.busLanes.forEach(busLane => {
+                if (busLane.way && busLane.way.geometry) {
+                    const coordinates = busLane.way.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                    L.polyline(coordinates, {
+                        color: 'orange',
+                        weight: 2,
+                        opacity: 0.6
+                    }).addTo(trafficLayer).bindPopup('Bus Lane');
+                }
+            });
         }
 
         // Clear route
@@ -164,6 +580,7 @@
             if (startMarker) map.removeLayer(startMarker);
             if (endMarker) map.removeLayer(endMarker);
             routeLayer.clearLayers();
+            if (trafficLayer) map.removeLayer(trafficLayer);
             startLocation = null;
             endLocation = null;
             document.getElementById('results').style.display = 'none';
