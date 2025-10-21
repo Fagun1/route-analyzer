@@ -15,10 +15,7 @@ class ProgressBar {
         this.total = 100;
         this.roadRoutesLayer = L.layerGroup(); // Layer for displaying actual road routes
         
-        // Add road routes layer to map if available
-        if (window.app && window.app.map) {
-            this.roadRoutesLayer.addTo(window.app.map);
-        }
+        // Don't add to map immediately - will be added when show() is called
     }
 
     /**
@@ -34,6 +31,14 @@ class ProgressBar {
         // Ensure road routes layer is added to map
         if (window.app && window.app.map && !window.app.map.hasLayer(this.roadRoutesLayer)) {
             this.roadRoutesLayer.addTo(window.app.map);
+            console.log('🗺️ Added road routes layer to map');
+            console.log('🗺️ Map layers count:', window.app.map._layers ? Object.keys(window.app.map._layers).length : 'unknown');
+        } else {
+            console.log('🗺️ Road routes layer already on map or map not available');
+            console.log('- window.app exists:', !!window.app);
+            console.log('- window.app.map exists:', !!(window.app && window.app.map));
+            console.log('- road routes layer exists:', !!this.roadRoutesLayer);
+            console.log('- road routes layer on map:', !!(this.roadRoutesLayer && window.app && window.app.map && window.app.map.hasLayer(this.roadRoutesLayer)));
         }
     }
 
@@ -108,11 +113,14 @@ class ProgressBar {
         console.log('- Route data:', routeData);
         console.log('- Geometry available:', !!routeData.geometry);
         console.log('- Map available:', !!(window.app && window.app.map));
+        console.log('- Color received:', color);
         
         // Remove previous highlight
         this.clearPathHighlight();
         
         if (window.app && window.app.map && routeData.geometry) {
+            console.log('🗺️ Road routes layer exists:', !!this.roadRoutesLayer);
+            console.log('🗺️ Road routes layer on map:', !!(this.roadRoutesLayer && window.app.map.hasLayer(this.roadRoutesLayer)));
             try {
                 console.log('Decoding polyline:', routeData.geometry.substring(0, 50) + '...');
                 
@@ -155,12 +163,23 @@ class ProgressBar {
                 }
                 
                 // Create road route polyline
+                console.log(`🎨 Creating road route with color: ${color}`);
+                console.log(`📍 Valid coordinates count: ${validCoords.length}`);
+                console.log(`📍 First coordinate: [${validCoords[0][0]}, ${validCoords[0][1]}]`);
+                console.log(`📍 Last coordinate: [${validCoords[validCoords.length-1][0]}, ${validCoords[validCoords.length-1][1]}]`);
+                
                 const roadRoute = L.polyline(validCoords, {
                     color: color,
-                    weight: 3,
-                    opacity: 0.8,
+                    weight: 5, // Increased weight for better visibility
+                    opacity: 1.0, // Increased opacity for better visibility
                     className: 'road-route'
                 }).addTo(this.roadRoutesLayer); // Add to dedicated layer
+                
+                console.log(`✅ Road route created and added to layer`);
+                console.log(`🎨 Route color: ${color}, weight: 5, opacity: 1.0`);
+                console.log(`🎨 Actual polyline color:`, roadRoute.options.color);
+                console.log(`🗺️ Road routes layer has ${this.roadRoutesLayer.getLayers().length} layers`);
+                console.log(`🗺️ Road routes layer visible: ${this.roadRoutesLayer.options.visible !== false}`);
                 
                 // Add popup with route info
                 roadRoute.bindPopup(`
@@ -257,6 +276,56 @@ class ProgressBar {
         }
     }
 
+    /**
+     * Test method to add a simple road route for debugging
+     */
+    testRoadRoute() {
+        if (window.app && window.app.map && this.roadRoutesLayer) {
+            console.log('🧪 Testing road route display...');
+            
+            // Ensure road routes layer is on map
+            if (!window.app.map.hasLayer(this.roadRoutesLayer)) {
+                this.roadRoutesLayer.addTo(window.app.map);
+                console.log('🧪 Added road routes layer to map for test');
+            }
+            
+            // Create a simple test route
+            const testCoords = [
+                [21.1556, 72.7601], // Test coordinates
+                [21.2798, 72.7957]
+            ];
+            
+            const testRoute = L.polyline(testCoords, {
+                color: '#ff0000', // Bright red for visibility
+                weight: 8, // Very thick for visibility
+                opacity: 1.0
+            }).addTo(this.roadRoutesLayer);
+            
+            console.log('🧪 Test route added to road routes layer');
+            console.log(`🗺️ Road routes layer now has ${this.roadRoutesLayer.getLayers().length} layers`);
+            console.log('🧪 Test route should be visible as a thick red line');
+            
+            return testRoute;
+        } else {
+            console.log('🧪 Cannot test road route - missing dependencies');
+            console.log('- window.app:', !!window.app);
+            console.log('- window.app.map:', !!(window.app && window.app.map));
+            console.log('- road routes layer:', !!this.roadRoutesLayer);
+        }
+    }
+
+    /**
+     * Clear all road routes
+     */
+    clearRoadRoutes() {
+        if (this.roadRoutesLayer) {
+            this.roadRoutesLayer.clearLayers();
+            console.log('🗑️ Cleared all road routes');
+        } else {
+            console.log('⚠️ Road routes layer not found');
+        }
+    }
+
 
     /**
      * Complete progress
@@ -312,23 +381,20 @@ class ProgressBar {
      */
     createProgressBar(title, total) {
         const container = document.getElementById(this.containerId);
-        if (!container) return;
-
-        // Create progress bar HTML if it doesn't exist
-        if (!container.querySelector('#progress-bar-fill')) {
-            container.innerHTML = `
-                <div id="progress-bar-container">
-                    <button id="progress-close" onclick="window.hideProgressBar()">×</button>
-                    <div id="progress-bar-fill"></div>
-                    <div id="progress-text">${title}</div>
-                    <div id="progress-details">Starting...</div>
-                </div>
-            `;
+        if (!container) {
+            console.error('Progress container not found:', this.containerId);
+            return;
         }
 
+        // Use existing HTML structure from the page
         this.progressBar = container.querySelector('#progress-bar-fill');
         this.progressText = container.querySelector('#progress-text');
         this.progressDetails = container.querySelector('#progress-details');
+        
+        if (!this.progressBar || !this.progressText || !this.progressDetails) {
+            console.error('Progress bar elements not found in existing HTML');
+            return;
+        }
         
         // Reset progress bar
         if (this.progressBar) {

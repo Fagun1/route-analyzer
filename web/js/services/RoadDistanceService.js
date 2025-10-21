@@ -198,19 +198,27 @@ class RoadDistanceService {
         
         // Generate colors for test centers
         const testCenterColors = this.generateTestCenterColors(testCenters.length);
+        console.log('🎨 Generated test center colors:', testCenterColors);
         
         // Process in batches with progress updates
         const batches = this.chunkArray(coordinatePairs, this.batchSize);
         let processedCount = 0;
+        const routeDataMap = {}; // Store route data for later use
         
         for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
             const batch = batches[batchIndex];
             const batchResults = await this.processBatchWithProgress(batch, processedCount, totalPairs, testCenterColors);
             
-            // Store results in matrix
+            // Store results in matrix and route data
             batchResults.forEach(result => {
                 matrix[result.personIndex][result.centerIndex] = result.distance;
+                // Store route data for later use
+                routeDataMap[`${result.personIndex}-${result.centerIndex}`] = result.routeData;
+                console.log(`🗺️ Stored route data for ${result.personIndex}-${result.centerIndex}:`, !!result.routeData.geometry);
             });
+            
+            console.log(`🗺️ Total route data stored: ${Object.keys(routeDataMap).length} routes`);
+            console.log(`🗺️ Route data keys:`, Object.keys(routeDataMap));
             
             processedCount += batch.length;
             
@@ -235,7 +243,11 @@ class RoadDistanceService {
             this.progressBar.complete('All road distances calculated successfully!');
         }
         
-        return matrix;
+        return {
+            matrix: matrix,
+            routeDataMap: routeDataMap,
+            testCenterColors: testCenterColors
+        };
     }
 
     /**
@@ -264,17 +276,14 @@ class RoadDistanceService {
                     centerIndex: pair.centerIndex,
                     distance: routeData.distance,
                     geometry: routeData.geometry,
-                    duration: routeData.duration
+                    duration: routeData.duration,
+                    routeData: routeData // Store full route data for later use
                 });
                 
                 console.log(`Calculated distance: Person ${pair.personIndex} -> Center ${pair.centerIndex}: ${routeData.distance.toFixed(2)} km`);
                 
-                // Display road route immediately
-                if (this.progressBar) {
-                    console.log('🎯 Calling displayRoadRoute with geometry:', routeData.geometry ? 'YES' : 'NO');
-                    const color = testCenterColors[pair.centerIndex] || '#4CAF50';
-                    this.progressBar.displayRoadRoute(pair.person, pair.center, routeData, color);
-                }
+                // Don't display road route immediately - only show for final assignments
+                // Road routes will be displayed after assignment algorithm determines shortest paths
                 
             } catch (error) {
                 console.error(`Error calculating distance for pair ${processedCount + i + 1}:`, error);

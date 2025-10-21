@@ -97,6 +97,78 @@ class RouteAnalyzerApp {
             console.log('- Checkbox value:', checkbox ? checkbox.value : 'NOT FOUND');
             return checkbox ? checkbox.checked : false;
         };
+        window.testRoadRoute = () => this.progressBar.testRoadRoute();
+        window.testRoadRoutesLayer = () => {
+            console.log('🧪 Testing Road Routes Layer:');
+            console.log('- Progress bar exists:', !!this.progressBar);
+            console.log('- Road routes layer exists:', !!(this.progressBar && this.progressBar.roadRoutesLayer));
+            console.log('- Map exists:', !!this.map);
+            console.log('- Road routes layer on map:', !!(this.progressBar && this.progressBar.roadRoutesLayer && this.map && this.map.hasLayer(this.progressBar.roadRoutesLayer)));
+            if (this.progressBar && this.progressBar.roadRoutesLayer) {
+                console.log('- Road routes layer count:', this.progressBar.roadRoutesLayer.getLayers().length);
+            }
+            return this.progressBar && this.progressBar.roadRoutesLayer;
+        };
+        
+        // Simple test to create a visible route
+        window.createSimpleTestRoute = () => {
+            console.log('🧪 Creating simple test route...');
+            if (this.map) {
+                // Create a simple test route directly on the map
+                const testCoords = [
+                    [21.1556, 72.7601],
+                    [21.2798, 72.7957]
+                ];
+                
+                const testRoute = L.polyline(testCoords, {
+                    color: '#FF0000',
+                    weight: 10,
+                    opacity: 1.0
+                }).addTo(this.map);
+                
+                console.log('🧪 Simple test route created directly on map');
+                console.log('🧪 Route should be visible as a thick red line');
+                return testRoute;
+            } else {
+                console.log('🧪 Map not available');
+            }
+        };
+        
+        // Test assignment with road routes
+        window.testAssignmentWithRoutes = () => {
+            console.log('🧪 Testing assignment with road routes...');
+            if (this.randomPoints && this.randomPoints.length > 0 && this.testCenters && this.testCenters.length > 0) {
+                console.log('🧪 Found people and test centers, testing assignment...');
+                this.assignPeopleToTestCenters();
+            } else {
+                console.log('🧪 No people or test centers found. Please generate them first.');
+            }
+        };
+        
+        // Test different colored routes
+        window.testColoredRoutes = () => {
+            console.log('🧪 Testing different colored routes...');
+            if (this.map && this.progressBar) {
+                const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6'];
+                colors.forEach((color, index) => {
+                    const testCoords = [
+                        [21.1556 + (index * 0.01), 72.7601 + (index * 0.01)],
+                        [21.2798 + (index * 0.01), 72.7957 + (index * 0.01)]
+                    ];
+                    
+                    const testRoute = L.polyline(testCoords, {
+                        color: color,
+                        weight: 8,
+                        opacity: 1.0
+                    }).addTo(this.progressBar.roadRoutesLayer);
+                    
+                    console.log(`🧪 Created test route ${index + 1} with color: ${color}`);
+                });
+                console.log('🧪 Created 5 test routes with different colors');
+            } else {
+                console.log('🧪 Map or progress bar not available');
+            }
+        };
     }
 
     /**
@@ -588,13 +660,24 @@ class RouteAnalyzerApp {
             const duration = ((endTime - startTime) / 1000).toFixed(3);
             
             // Visualize assignments
-            this.assignmentVisualizer.visualizeAssignments(assignmentResult.assignmentResults, {
-                showLines: true,
-                showStats: true,
-                lineOpacity: 0.7,
-                lineWeight: 2,
-                showPopups: true
-            });
+            if (useRoadDistances) {
+                // When using road distances, road routes are already displayed by ProgressBar
+                // Only show markers and stats, no straight lines
+                this.assignmentVisualizer.visualizeAssignments(assignmentResult.assignmentResults, {
+                    showLines: false, // Don't show straight lines
+                    showStats: true,
+                    showPopups: true
+                });
+            } else {
+                // When using straight-line distances, show assignment lines
+                this.assignmentVisualizer.visualizeAssignments(assignmentResult.assignmentResults, {
+                    showLines: true,
+                    showStats: true,
+                    lineOpacity: 0.7,
+                    lineWeight: 2,
+                    showPopups: true
+                });
+            }
             
             // Display assignment statistics
             this.displayAssignmentStats(assignmentResult.stats, duration, assignmentResult.distanceType);
