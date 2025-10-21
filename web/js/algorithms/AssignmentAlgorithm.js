@@ -18,6 +18,8 @@ class AssignmentAlgorithm {
         };
         this.roadDistanceService = null;
         this.useRoadDistances = true; // Flag to enable/disable road distances
+        this.routeDataMap = {}; // Store route data for road routes
+        this.testCenterColors = {}; // Store test center colors
     }
 
     /**
@@ -77,7 +79,12 @@ class AssignmentAlgorithm {
         
         if (this.useRoadDistances && this.roadDistanceService) {
             console.log('🚗 Calculating road-based distance matrix...');
-            return await this.roadDistanceService.calculateRoadDistanceMatrixBatch(people, testCenters, progressBar);
+            const result = await this.roadDistanceService.calculateRoadDistanceMatrixBatch(people, testCenters, progressBar);
+            // Store route data for later use
+            this.routeDataMap = result.routeDataMap;
+            this.testCenterColors = result.testCenterColors;
+            console.log('🎨 Stored test center colors:', this.testCenterColors);
+            return result.matrix;
         } else {
             console.log('📏 Calculating straight-line distance matrix...');
             return this.calculateHaversineDistanceMatrix(people, testCenters);
@@ -149,6 +156,9 @@ class AssignmentAlgorithm {
                 // Make assignment
                 this.assignments.set(originalPersonIndex, centerIndex);
                 this.testCenterCapacity.set(centerIndex, this.testCenterCapacity.get(centerIndex) - 1);
+                
+                // Display road route for this assignment if available
+                this.displayRoadRouteForAssignment(person, testCenters[centerIndex], originalPersonIndex, centerIndex);
                 
                 results.push({
                     personIndex: originalPersonIndex,
@@ -277,6 +287,47 @@ class AssignmentAlgorithm {
      */
     isRoadDistanceEnabled() {
         return this.useRoadDistances;
+    }
+
+    /**
+     * Display road route for a specific assignment
+     * @param {Point} person - Person point
+     * @param {Point} center - Test center point
+     * @param {number} personIndex - Person index
+     * @param {number} centerIndex - Center index
+     */
+    displayRoadRouteForAssignment(person, center, personIndex, centerIndex) {
+        console.log(`🎯 Attempting to display road route for assignment: Person ${personIndex} -> Center ${centerIndex}`);
+        console.log(`🎯 Person coordinates: [${person.lat}, ${person.lng}]`);
+        console.log(`🎯 Center coordinates: [${center.lat}, ${center.lng}]`);
+        
+        // Only display if we have route data and progress bar
+        if (this.routeDataMap && this.testCenterColors && window.app && window.app.progressBar) {
+            const routeKey = `${personIndex}-${centerIndex}`;
+            const routeData = this.routeDataMap[routeKey];
+            
+            console.log(`🎯 Route key: ${routeKey}`);
+            console.log(`🎯 Route data exists:`, !!routeData);
+            console.log(`🎯 Route data geometry exists:`, !!(routeData && routeData.geometry));
+            
+            if (routeData && routeData.geometry) {
+                const color = this.testCenterColors[centerIndex] || '#4CAF50';
+                console.log(`🎯 Displaying road route for assignment: Person ${personIndex} -> Center ${centerIndex}`);
+                console.log(`🎨 Using color: ${color} for center ${centerIndex}`);
+                console.log(`🎨 Center index: ${centerIndex}, Color: ${color}`);
+                console.log(`🎨 Available colors:`, this.testCenterColors);
+                window.app.progressBar.displayRoadRoute(person, center, routeData, color);
+            } else {
+                console.log(`⚠️ No route data found for ${routeKey}`);
+                console.log(`⚠️ Available route keys:`, Object.keys(this.routeDataMap || {}));
+            }
+        } else {
+            console.log(`⚠️ Cannot display road route - missing dependencies`);
+            console.log(`- routeDataMap exists:`, !!this.routeDataMap);
+            console.log(`- testCenterColors exists:`, !!this.testCenterColors);
+            console.log(`- window.app exists:`, !!window.app);
+            console.log(`- progressBar exists:`, !!(window.app && window.app.progressBar));
+        }
     }
 
     /**

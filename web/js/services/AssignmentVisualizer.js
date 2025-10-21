@@ -17,8 +17,9 @@ class AssignmentVisualizer {
      * @param {Object} options - Visualization options
      */
     visualizeAssignments(assignmentResults, options = {}) {
-        // Clear existing visualizations
-        this.clearVisualizations();
+        // Clear existing visualizations, but preserve road routes if using road distances
+        const preserveRoadRoutes = options.showLines === false; // If showLines is false, we're using road routes
+        this.clearVisualizations(!preserveRoadRoutes);
         
         const {
             showLines = true,
@@ -332,8 +333,9 @@ class AssignmentVisualizer {
 
     /**
      * Clear all visualizations
+     * @param {boolean} clearRoadRoutes - Whether to clear road routes (default: true)
      */
-    clearVisualizations() {
+    clearVisualizations(clearRoadRoutes = true) {
         // Clear assignment lines
         this.assignmentLines.forEach(line => {
             this.assignmentLayer.removeLayer(line);
@@ -345,6 +347,11 @@ class AssignmentVisualizer {
             this.assignmentLayer.removeLayer(marker);
         });
         this.assignmentMarkers = [];
+        
+        // Clear road routes only if requested (not during road distance assignments)
+        if (clearRoadRoutes && window.app && window.app.progressBar) {
+            window.app.progressBar.clearRoadRoutes();
+        }
         
         // Clear stats panel
         if (this.statsPanel) {

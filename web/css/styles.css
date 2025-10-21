@@ -269,14 +269,13 @@ body {
 
 /* Road route styling */
 .road-route {
-    stroke: #4CAF50 !important;
-    stroke-width: 3px !important;
-    stroke-opacity: 0.8 !important;
+    stroke-width: 5px !important;
+    stroke-opacity: 1.0 !important;
     stroke-dasharray: none !important;
 }
 
 .road-route:hover {
-    stroke-width: 4px !important;
+    stroke-width: 6px !important;
     stroke-opacity: 1 !important;
 }
 
