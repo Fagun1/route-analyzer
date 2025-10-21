@@ -189,6 +189,97 @@ body {
     color: #2ecc71;
 }
 
+/* Progress Bar Styles - Top Right Corner */
+#progress-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+    max-width: 350px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    display: none;
+}
+
+#progress-backdrop {
+    display: none; /* Remove backdrop for non-blocking experience */
+}
+
+#progress-bar-container {
+    padding: 20px;
+    position: relative;
+}
+
+#progress-bar-fill {
+    width: 0%;
+    height: 8px;
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+}
+
+#progress-text {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #333;
+    font-weight: 500;
+}
+
+#progress-details {
+    margin-top: 5px;
+    font-size: 12px;
+    color: #666;
+}
+
+#progress-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: #999;
+    padding: 5px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+#progress-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: #333;
+}
+
+/* Path highlighting during calculation */
+.path-highlight {
+    stroke: #ff6b6b !important;
+    stroke-width: 3px !important;
+    stroke-opacity: 0.8 !important;
+    animation: pathPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pathPulse {
+    0%, 100% { stroke-opacity: 0.8; }
+    50% { stroke-opacity: 0.4; }
+}
+
+/* Road route styling */
+.road-route {
+    stroke: #4CAF50 !important;
+    stroke-width: 3px !important;
+    stroke-opacity: 0.8 !important;
+    stroke-dasharray: none !important;
+}
+
+.road-route:hover {
+    stroke-width: 4px !important;
+    stroke-opacity: 1 !important;
+}
+
 /* Legend styles */
 .legend-sidebar {
     margin-top: 20px;
