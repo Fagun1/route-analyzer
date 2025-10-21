@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Analyzer - DSA Project</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Route Planner</h2>
+            
+            <div class="input-group">
+                <label>Start Location</label>
+                <input type="text" id="start" placeholder="Enter start address">
+            </div>
+            
+            <div class="input-group">
+                <label>End Location</label>
+                <input type="text" id="end" placeholder="Enter destination">
+            </div>
+            
+            <button class="btn" onclick="findRoute()">Find Route</button>
+            <button class="btn btn-secondary" onclick="getUserLocation()">📍 My Location</button>
+            <button class="btn btn-secondary" onclick="clearRoute()">Clear</button>
+            
+            <hr style="margin: 20px 0; border: 1px solid #eee;">
+            
+            <h3>People Generator</h3>
+            <div class="input-group">
+                <label>Number of People</label>
+                <input type="number" id="numPoints" placeholder="Enter number" min="1" max="10000" value="1000">
+            </div>
+            
+            <button class="btn" onclick="generateRandomLocations()">👥 Generate People</button>
+            <button class="btn btn-secondary" onclick="clearRandomPoints()">Clear People</button>
+            
+            <hr style="margin: 20px 0; border: 1px solid #eee;">
+            
+            <h3>Test Centers Generator</h3>
+            <div class="input-group">
+                <label>Number of Test Centers</label>
+                <input type="number" id="numTestCenters" placeholder="Enter number" min="1" max="100" value="5">
+            </div>
+            
+            <button class="btn" onclick="generateTestCenters()">🏥 Generate Test Centers</button>
+            <button class="btn btn-secondary" onclick="clearTestCenters()">Clear Test Centers</button>
+            
+            <hr style="margin: 20px 0; border: 1px solid #eee;">
+            
+            <h3>Radius Settings</h3>
+            <div class="input-group">
+                <label>Radius (km)</label>
+                <input type="number" id="radiusKm" placeholder="Enter radius" min="0.1" max="1000" step="0.1" value="10">
+            </div>
+            
+            <div class="results" id="results">
+                <h3>Route Details</h3>
+                <div class="info">
+                    <span>Distance:</span>
+                    <span id="distance">--</span>
+                </div>
+                <div class="info">
+                    <span>Duration:</span>
+                    <span id="duration">--</span>
+                </div>
+                <div class="info">
+                    <span>Speed:</span>
+                    <span id="speed">--</span>
+                </div>
+                <div class="info">
+                    <span>Traffic Impact:</span>
+                    <span id="traffic-impact">--</span>
+                </div>
+                <div class="info">
+                    <span>Traffic Signals:</span>
+                    <span id="traffic-signals">--</span>
+                </div>
+                <div class="info">
+                    <span>Construction:</span>
+                    <span id="construction">--</span>
+                </div>
+                <div class="info">
+                    <span>Road Closures:</span>
+                    <span id="closures">--</span>
+                </div>
+            </div>
+            
+            <!-- Legend - Always visible at bottom of sidebar -->
+            <div class="legend-sidebar">
+                <h4 style="margin: 0 0 10px 0; font-size: 14px;">Legend</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #3498db;"></div>
+                    <span class="legend-text">👨 Male</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e74c3c;"></div>
+                    <span class="legend-text">👩 Female</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #f39c12;"></div>
+                    <span class="legend-text">♿ PWD</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #2ecc71;"></div>
+                    <span class="legend-text">🏥 Test Centers</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="map">
+            <div id="map"></div>
+            <div class="loading" id="loading">Calculating route...</div>
+        </div>
+    </div>
+
+    <!-- Leaflet.js -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Data Structures -->
+    <script src="js/datastructures/Graph.js"></script>
+    <script src="js/datastructures/Point.js"></script>
+    <script src="js/datastructures/PriorityQueue.js"></script>
+    
+    <!-- Algorithms -->
+    <script src="js/algorithms/Dijkstra.js"></script>
+    <script src="js/algorithms/RandomPointGenerator.js"></script>
+    
+    <!-- Services -->
+    <script src="js/services/TrafficService.js"></script>
+    <script src="js/services/TrafficProcessor.js"></script>
+    
+    <!-- Utilities -->
+    <script src="js/utils/Utils.js"></script>
+    
+    <!-- Main Application -->
+    <script src="js/app.js"></script>
+</body>
+</html>
