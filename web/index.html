@@ -56,6 +56,27 @@
                 <input type="number" id="radiusKm" placeholder="Enter radius" min="0.1" max="1000" step="0.1" value="10">
             </div>
             
+            <hr style="margin: 20px 0; border: 1px solid #eee;">
+            
+            <h3>Assignment Algorithm</h3>
+            <div class="input-group">
+                <label>Capacity per Test Center</label>
+                <input type="number" id="capacityPerCenter" placeholder="Enter capacity" min="1" max="1000" value="50">
+            </div>
+            
+            <div class="input-group">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="useRoadDistances" checked>
+                    <span>Use Road Distances (OSRM)</span>
+                </label>
+                <small style="color: #666; font-size: 11px; margin-top: 4px;">
+                    Road distances are more accurate but slower. Uncheck for faster straight-line distances.
+                </small>
+            </div>
+            
+            <button class="btn" onclick="assignPeopleToTestCenters()">🎯 Assign People</button>
+            <button class="btn btn-secondary" onclick="clearAssignments()">Clear Assignments</button>
+            
             <div class="results" id="results">
                 <h3>Route Details</h3>
                 <div class="info">
@@ -107,12 +128,32 @@
                     <div class="legend-color" style="background-color: #2ecc71;"></div>
                     <span class="legend-text">🏥 Test Centers</span>
                 </div>
+                <hr style="margin: 10px 0; border: 1px solid #eee;">
+                <div style="font-size: 11px; color: #666; margin-bottom: 8px;">
+                    <strong>Assignment Lines:</strong><br>
+                    Same color = Same test center
+                </div>
+                <div style="font-size: 10px; color: #888;">
+                    • Dashed = PWD (Priority 1)<br>
+                    • Dotted = Female (Priority 2)<br>
+                    • Solid = Male (Priority 3)
+                </div>
             </div>
         </div>
         
         <div class="map">
             <div id="map"></div>
             <div class="loading" id="loading">Calculating route...</div>
+        </div>
+    </div>
+
+    <!-- Progress Container -->
+    <div id="progress-container">
+        <div id="progress-bar-container">
+            <button id="progress-close" onclick="window.hideProgressBar()">×</button>
+            <div id="progress-bar-fill"></div>
+            <div id="progress-text">Processing...</div>
+            <div id="progress-details"></div>
         </div>
     </div>
 
@@ -125,15 +166,19 @@
     <script src="js/datastructures/PriorityQueue.js"></script>
     
     <!-- Algorithms -->
-    <script src="js/algorithms/Dijkstra.js"></script>
     <script src="js/algorithms/RandomPointGenerator.js"></script>
+    <script src="js/algorithms/AssignmentAlgorithm.js"></script>
+    <script src="js/algorithms/AStarAlgorithm.js"></script>
     
     <!-- Services -->
     <script src="js/services/TrafficService.js"></script>
     <script src="js/services/TrafficProcessor.js"></script>
+    <script src="js/services/AssignmentVisualizer.js"></script>
+    <script src="js/services/RoadDistanceService.js"></script>
     
     <!-- Utilities -->
     <script src="js/utils/Utils.js"></script>
+    <script src="js/utils/ProgressBar.js"></script>
     
     <!-- Main Application -->
     <script src="js/app.js"></script>

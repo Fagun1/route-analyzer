@@ -20,8 +20,15 @@ class RouteAnalyzerApp {
         
         this.trafficProcessor = new TrafficDataProcessor();
         this.randomPointGenerator = new RandomPointGenerator();
+        this.assignmentAlgorithm = new AssignmentAlgorithm();
+        this.assignmentVisualizer = null;
+        this.roadDistanceService = new RoadDistanceService();
+        this.progressBar = new ProgressBar('progress-container');
+        
+        // Make app globally accessible for ProgressBar
+        window.app = this;
         this.graph = new Graph();
-        this.dijkstra = null;
+        this.aStarAlgorithm = new AStarAlgorithm();
         
         this.init();
     }
@@ -49,6 +56,10 @@ class RouteAnalyzerApp {
         
         this.routeLayer = L.layerGroup().addTo(this.map);
         this.randomPointsLayer = L.layerGroup().addTo(this.map);
+        this.assignmentLayer = L.layerGroup().addTo(this.map);
+        
+        // Initialize assignment visualizer
+        this.assignmentVisualizer = new AssignmentVisualizer(this.map, this.assignmentLayer);
         
         this.getUserLocation();
         
@@ -75,6 +86,17 @@ class RouteAnalyzerApp {
         window.clearRandomPoints = () => this.clearRandomPoints();
         window.generateTestCenters = () => this.generateTestCenters();
         window.clearTestCenters = () => this.clearTestCenters();
+        window.assignPeopleToTestCenters = () => this.assignPeopleToTestCenters();
+        window.clearAssignments = () => this.clearAssignments();
+        window.testPolylineDecoder = () => this.progressBar.testPolylineDecoder();
+        window.testRoadDistanceCheckbox = () => {
+            const checkbox = document.getElementById('useRoadDistances');
+            console.log('🔍 Road Distance Checkbox Test:');
+            console.log('- Checkbox element:', checkbox);
+            console.log('- Checkbox checked:', checkbox ? checkbox.checked : 'NOT FOUND');
+            console.log('- Checkbox value:', checkbox ? checkbox.value : 'NOT FOUND');
+            return checkbox ? checkbox.checked : false;
+        };
     }
 
     /**
@@ -516,6 +538,128 @@ class RouteAnalyzerApp {
         this.randomPoints = [];
         
         // Legend is now permanent in sidebar
+    }
+
+    /**
+     * Assign people to test centers using priority algorithm
+     */
+    async assignPeopleToTestCenters() {
+        if (this.randomPoints.length === 0) {
+            Utils.showToast('Please generate people first', 'warning');
+            return;
+        }
+        
+        if (this.testCenters.length === 0) {
+            Utils.showToast('Please generate test centers first', 'warning');
+            return;
+        }
+        
+        const capacityPerCenter = parseInt(document.getElementById('capacityPerCenter').value) || 50;
+        const useRoadDistances = document.getElementById('useRoadDistances').checked;
+        
+        console.log('🔍 Assignment Debug Info:');
+        console.log('- Capacity per center:', capacityPerCenter);
+        console.log('- Use road distances:', useRoadDistances);
+        console.log('- Number of people:', this.randomPoints.length);
+        console.log('- Number of test centers:', this.testCenters.length);
+        
+        // Configure assignment algorithm
+        this.assignmentAlgorithm.setRoadDistanceEnabled(useRoadDistances);
+        console.log('- Road distance enabled:', this.assignmentAlgorithm.isRoadDistanceEnabled());
+        
+        // Show progress bar for road distances
+        if (useRoadDistances) {
+            this.progressBar.show('Calculating Road Distances', this.randomPoints.length * this.testCenters.length);
+        }
+        
+        Utils.showLoading(true);
+        const distanceType = useRoadDistances ? 'road-based' : 'straight-line';
+        
+        try {
+            const startTime = performance.now();
+            
+            // Run assignment algorithm with road distance service and progress bar
+            const assignmentResult = await this.assignmentAlgorithm.assignPeopleToTestCenters(
+                this.randomPoints, this.testCenters, capacityPerCenter, 
+                this.roadDistanceService, this.progressBar
+            );
+            
+            const endTime = performance.now();
+            const duration = ((endTime - startTime) / 1000).toFixed(3);
+            
+            // Visualize assignments
+            this.assignmentVisualizer.visualizeAssignments(assignmentResult.assignmentResults, {
+                showLines: true,
+                showStats: true,
+                lineOpacity: 0.7,
+                lineWeight: 2,
+                showPopups: true
+            });
+            
+            // Display assignment statistics
+            this.displayAssignmentStats(assignmentResult.stats, duration, assignmentResult.distanceType);
+            
+            Utils.showToast(`${distanceType} assignment completed in ${duration}s!`, 'success');
+            
+        } catch (error) {
+            console.error('Assignment error:', error);
+            Utils.showToast('Error during assignment', 'error');
+            this.progressBar.error('Assignment failed');
+        }
+        
+        Utils.showLoading(false);
+    }
+
+    /**
+     * Display assignment statistics
+     * @param {Object} stats - Assignment statistics
+     * @param {number} duration - Assignment duration
+     * @param {string} distanceType - Type of distance calculation used
+     */
+    displayAssignmentStats(stats, duration, distanceType = 'straight-line') {
+        const statsHtml = `
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid #e9ecef;">
+                <h4 style="margin: 0 0 10px 0; color: #2c3e50;">Assignment Results</h4>
+                <div style="font-size: 12px; line-height: 1.4;">
+                    <div><strong>Total Assigned:</strong> ${stats.totalAssigned}</div>
+                    <div style="color: #f39c12;"><strong>♿ PWD:</strong> ${stats.pwdAssigned}</div>
+                    <div style="color: #e74c3c;"><strong>👩 Female:</strong> ${stats.femaleAssigned}</div>
+                    <div style="color: #3498db;"><strong>👨 Male:</strong> ${stats.maleAssigned}</div>
+                    <hr style="margin: 8px 0;">
+                    <div><strong>Avg Distance:</strong> ${stats.averageDistance.toFixed(2)} km</div>
+                    <div><strong>Max Distance:</strong> ${stats.maxDistance.toFixed(2)} km</div>
+                    <div><strong>Min Distance:</strong> ${stats.minDistance.toFixed(2)} km</div>
+                    <div><strong>Distance Type:</strong> ${distanceType}</div>
+                    <div><strong>Algorithm Time:</strong> ${duration}s</div>
+                </div>
+            </div>
+        `;
+        
+        // Add to sidebar
+        const sidebar = document.querySelector('.sidebar');
+        let statsDiv = document.getElementById('assignment-stats');
+        if (!statsDiv) {
+            statsDiv = document.createElement('div');
+            statsDiv.id = 'assignment-stats';
+            sidebar.appendChild(statsDiv);
+        }
+        statsDiv.innerHTML = statsHtml;
+    }
+
+    /**
+     * Clear assignments
+     */
+    clearAssignments() {
+        this.assignmentVisualizer.clearVisualizations();
+        this.assignmentAlgorithm.clearAssignments();
+        
+        // Remove assignment stats from sidebar
+        const statsDiv = document.getElementById('assignment-stats');
+        if (statsDiv) {
+            statsDiv.remove();
+        }
+        
+        Utils.showToast('Assignments cleared', 'success');
     }
 
     /**

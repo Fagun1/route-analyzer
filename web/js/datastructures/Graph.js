@@ -141,7 +141,7 @@ class Graph {
 
     /**
      * Get the number of edges
-     * @returns {number} Number of edges
+     * @returns {number} Number of edgesu
      */
     getEdgeCount() {
         let count = 0;
